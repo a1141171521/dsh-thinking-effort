@@ -11,7 +11,7 @@ DSH 的 llm 服务只为**适配器声明了档位**的模型接受 `reasoningEf
 （自定义）模型通常没有声明，导致模型选择器隐藏 Effort 行，显式选择档位时
 还会报 `UNSUPPORTED_REASONING_EFFORT`。本插件在激活时（以及
 `llm-pi-ai` 配置每次变化时）自动为 `llm-pi-ai` 下所有 OpenAI 兼容模型补上
-Codex 风格档位声明：
+档位声明：
 
 ```yaml
 reasoningEfforts:
@@ -19,7 +19,14 @@ reasoningEfforts:
   low: low       # 发送 reasoning_effort: "low"
   medium: medium
   high: high
+  xhigh: xhigh
+  max: max
 ```
+
+> 档位集合与 DeepSeek 协议网关一致（该协议只接受 low / medium / high /
+> xhigh / max，拒绝 minimal）。已声明的模型会**补齐缺失档位**，已有值
+> （包括手动钉为 `null` 的）保持不动；`reasoningEfforts: false` 的模型
+> 不触碰。
 
 声明后，内置模型选择器的模型下方会出现 Effort 行，可逐档选择；选中的档位
 通过官方 `selectModel` 通道保存，请求时以 `reasoning_effort` 参数发送。

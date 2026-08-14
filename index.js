@@ -1,12 +1,11 @@
 /**
  * dsh-thinking-effort
  *
- * Declares Codex-style reasoning effort levels (Off / Low / Medium / High) for
- * OpenAI-compatible third-party models configured under `llm-pi-ai`, so the
- * built-in model selector shows its Effort row for those models — the same
- * shape built-in deepseek models have — and pins a route-level default effort
- * so re-selecting a model keeps your chosen level instead of falling back to
- * the provider default.
+ * Declares reasoning effort levels for OpenAI-compatible third-party models
+ * configured under `llm-pi-ai`, so the built-in model selector shows its
+ * Effort row for those models — the same shape built-in deepseek models
+ * have — and pins a route-level default effort so re-selecting a model keeps
+ * your chosen level instead of falling back to the provider default.
  *
  * Background: DSH's llm service only accepts a reasoning effort for a model
  * whose adapter reports it. The pi-ai adapter reports efforts only when the
@@ -14,11 +13,11 @@
  * usually omit that declaration, so the selector hides the Effort row and any
  * explicit effort is rejected with `UNSUPPORTED_REASONING_EFFORT`. This plugin
  * fills the gap: on activation (and whenever the `llm-pi-ai` settings section
- * changes) it patches each OpenAI-compatible model that declares no efforts
- * with the Codex-style set, and pins the route-level `reasoning` default to
- * {@link DEFAULT_EFFORT} (config `defaultEffort`, default `high`), writing
- * through the settings service. Once declared, the effort is sent on the wire
- * as `reasoning_effort`.
+ * changes) it patches each OpenAI-compatible model's efforts (adding missing
+ * levels without touching existing ones), and pins the route-level `reasoning`
+ * default to {@link DEFAULT_EFFORT} (config `defaultEffort`, default `high`),
+ * writing through the settings service. Once declared, the effort is sent on
+ * the wire as `reasoning_effort`.
  *
  * The route-level `reasoning` value is what the adapter reports as each
  * model's `defaultEffort`; the built-in model selector sends that value when
@@ -36,8 +35,13 @@ export const name = 'dsh-thinking-effort'
 
 export const inject = ['settings']
 
-/** Codex-style effort set; `off: null` means "supported, send nothing". */
-const EFFORTS = { off: null, low: 'low', medium: 'medium', high: 'high' }
+/**
+ * Effort set declared for models that declare none. The wire spelling equals
+ * the level id (DeepSeek-protocol gateways accept these). `off: null` means
+ * "supported, send nothing". Levels the deployment endpoint rejects (e.g.
+ * `minimal`) are left out; see README.
+ */
+const EFFORTS = { off: null, low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }
 
 /** Route-level default effort pinned when the provider declares none of its own. */
 const DEFAULT_EFFORT = 'high'
@@ -71,8 +75,24 @@ export function apply(ctx, config) {
         if (models !== undefined) {
           const next = models.map((entry) => {
             if (entry === undefined || entry === null || typeof entry !== 'object') return entry
-            if (entry.reasoningEfforts !== undefined) return entry
-            return Object.assign({}, entry, { reasoningEfforts: EFFORTS })
+            const existing = entry.reasoningEfforts
+            // Explicitly disabled reasoning: leave the model alone.
+            if (existing === false) return entry
+            if (existing === undefined || existing === null) {
+              return Object.assign({}, entry, { reasoningEfforts: EFFORTS })
+            }
+            // Already declared: add missing levels only, preserving the
+            // deployment's own values (including `null` pins).
+            let missing = false
+            const merged = Object.assign({}, existing)
+            for (const level of Object.keys(EFFORTS)) {
+              if (!(level in merged)) {
+                merged[level] = EFFORTS[level]
+                missing = true
+              }
+            }
+            if (!missing) return entry
+            return Object.assign({}, entry, { reasoningEfforts: merged })
           })
           const changed = next.some((entry, index) => entry !== models[index])
           if (changed) providerPatch.models = next
@@ -108,8 +128,8 @@ export function apply(ctx, config) {
   poll()
 
   // Re-declare whenever the section changes (a model added later, or the user
-  // hand-editing settings.yaml). Idempotent: models that already declare
-  // efforts and providers that already pin a default are left untouched.
+  // hand-editing settings.yaml). Idempotent: models that already declare all
+  // levels and providers that already pin a default are left untouched.
   ctx.on('settings/updated', (ns) => {
     if (String(ns) !== 'llm-pi-ai') return
     void declare()

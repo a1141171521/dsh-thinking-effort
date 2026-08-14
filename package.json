@@ -1,6 +1,6 @@
 {
   "name": "dsh-thinking-effort",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Declare Codex-style reasoning effort levels for OpenAI-compatible third-party models, pin the route-level default effort (high by default) so re-selecting a model keeps your level, and remember per-model effort choices in the browser.",
   "type": "module",
   "main": "index.js",
