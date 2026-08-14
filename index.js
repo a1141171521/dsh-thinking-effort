@@ -24,6 +24,12 @@
  * model's `defaultEffort`; the built-in model selector sends that value when
  * a model row is picked, so switching away and back keeps your choice rather
  * than clearing it.
+ *
+ * Timing: the `llm-pi-ai` settings namespace is registered by the pi-ai
+ * adapter plugin, which may activate after this plugin. `settings.get` on an
+ * unregistered namespace returns undefined, so activation polls briefly for
+ * the namespace before declaring; the `settings/updated` listener then keeps
+ * declarations in sync with later configuration changes.
  */
 
 export const name = 'dsh-thinking-effort'
@@ -35,6 +41,10 @@ const EFFORTS = { off: null, low: 'low', medium: 'medium', high: 'high' }
 
 /** Route-level default effort pinned when the provider declares none of its own. */
 const DEFAULT_EFFORT = 'high'
+
+/** How long to keep polling for the `llm-pi-ai` namespace at activation. */
+const NAMESPACE_POLL_MS = 250
+const NAMESPACE_POLL_ATTEMPTS = 24
 
 export function apply(ctx, config) {
   const defaultEffort = config?.defaultEffort ?? DEFAULT_EFFORT
@@ -78,13 +88,35 @@ export function apply(ctx, config) {
     }
   }
 
-  // Declare on activation, and again whenever the section changes (a model
-  // added later, or the user hand-editing settings.yaml). Idempotent: models
-  // that already declare efforts and providers that already pin a default
-  // are left untouched.
-  void declare()
+  // The pi-ai adapter registers the `llm-pi-ai` namespace during activation;
+  // poll briefly for it before the first declaration attempt.
+  let attempts = NAMESPACE_POLL_ATTEMPTS
+  let timer = null
+  const poll = () => {
+    const section = ctx.settings.get('llm-pi-ai')
+    if (section !== undefined && section !== null && typeof section === 'object') {
+      void declare()
+      return
+    }
+    attempts -= 1
+    if (attempts <= 0) {
+      console.warn('[dsh-thinking-effort] llm-pi-ai settings namespace never appeared; declarations deferred to settings/updated')
+      return
+    }
+    timer = setTimeout(poll, NAMESPACE_POLL_MS)
+  }
+  poll()
+
+  // Re-declare whenever the section changes (a model added later, or the user
+  // hand-editing settings.yaml). Idempotent: models that already declare
+  // efforts and providers that already pin a default are left untouched.
   ctx.on('settings/updated', (ns) => {
     if (String(ns) !== 'llm-pi-ai') return
     void declare()
+  })
+
+  // Stop the poll timer on teardown.
+  ctx.effect(() => () => {
+    if (timer !== null) clearTimeout(timer)
   })
 }
