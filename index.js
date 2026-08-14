@@ -4,7 +4,9 @@
  * Declares Codex-style reasoning effort levels (Off / Low / Medium / High) for
  * OpenAI-compatible third-party models configured under `llm-pi-ai`, so the
  * built-in model selector shows its Effort row for those models — the same
- * shape built-in deepseek models have.
+ * shape built-in deepseek models have — and pins a route-level default effort
+ * so re-selecting a model keeps your chosen level instead of falling back to
+ * the provider default.
  *
  * Background: DSH's llm service only accepts a reasoning effort for a model
  * whose adapter reports it. The pi-ai adapter reports efforts only when the
@@ -13,8 +15,15 @@
  * explicit effort is rejected with `UNSUPPORTED_REASONING_EFFORT`. This plugin
  * fills the gap: on activation (and whenever the `llm-pi-ai` settings section
  * changes) it patches each OpenAI-compatible model that declares no efforts
- * with the Codex-style set, writing through the settings service. Once
- * declared, the effort is sent on the wire as `reasoning_effort`.
+ * with the Codex-style set, and pins the route-level `reasoning` default to
+ * {@link DEFAULT_EFFORT} (config `defaultEffort`, default `high`), writing
+ * through the settings service. Once declared, the effort is sent on the wire
+ * as `reasoning_effort`.
+ *
+ * The route-level `reasoning` value is what the adapter reports as each
+ * model's `defaultEffort`; the built-in model selector sends that value when
+ * a model row is picked, so switching away and back keeps your choice rather
+ * than clearing it.
  */
 
 export const name = 'dsh-thinking-effort'
@@ -24,7 +33,12 @@ export const inject = ['settings']
 /** Codex-style effort set; `off: null` means "supported, send nothing". */
 const EFFORTS = { off: null, low: 'low', medium: 'medium', high: 'high' }
 
-export function apply(ctx) {
+/** Route-level default effort pinned when the provider declares none of its own. */
+const DEFAULT_EFFORT = 'high'
+
+export function apply(ctx, config) {
+  const defaultEffort = config?.defaultEffort ?? DEFAULT_EFFORT
+
   const declare = async () => {
     try {
       const section = ctx.settings.get('llm-pi-ai')
@@ -37,16 +51,24 @@ export function apply(ctx) {
         const profile = providers[provider]
         if (profile === undefined || profile === null || typeof profile !== 'object') continue
         if (profile.api !== 'openai-completions') continue
+        const providerPatch = {}
+        // Pin the route-level default effort so re-selecting a model keeps
+        // the level. Only when the deployment left it unset.
+        if (profile.reasoning === undefined && defaultEffort !== undefined) {
+          providerPatch.reasoning = defaultEffort
+        }
         const models = Array.isArray(profile.models) ? profile.models : undefined
-        if (models === undefined) continue
-        const next = models.map((entry) => {
-          if (entry === undefined || entry === null || typeof entry !== 'object') return entry
-          if (entry.reasoningEfforts !== undefined) return entry
-          return Object.assign({}, entry, { reasoningEfforts: EFFORTS })
-        })
-        const changed = next.some((entry, index) => entry !== models[index])
-        if (!changed) continue
-        patch[provider] = { models: next }
+        if (models !== undefined) {
+          const next = models.map((entry) => {
+            if (entry === undefined || entry === null || typeof entry !== 'object') return entry
+            if (entry.reasoningEfforts !== undefined) return entry
+            return Object.assign({}, entry, { reasoningEfforts: EFFORTS })
+          })
+          const changed = next.some((entry, index) => entry !== models[index])
+          if (changed) providerPatch.models = next
+        }
+        if (Object.keys(providerPatch).length === 0) continue
+        patch[provider] = providerPatch
         touched = true
       }
       if (!touched) return
@@ -58,7 +80,8 @@ export function apply(ctx) {
 
   // Declare on activation, and again whenever the section changes (a model
   // added later, or the user hand-editing settings.yaml). Idempotent: models
-  // that already declare efforts are left untouched.
+  // that already declare efforts and providers that already pin a default
+  // are left untouched.
   void declare()
   ctx.on('settings/updated', (ns) => {
     if (String(ns) !== 'llm-pi-ai') return

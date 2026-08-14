@@ -1,16 +1,25 @@
-{
-  "name": "dsh-thinking-effort",
-  "version": "0.2.0",
-  "description": "Declare Codex-style reasoning effort levels for OpenAI-compatible third-party models in DeepSeek Harness, so the built-in model selector shows the Effort row — and remember the last effort chosen per model across model switches.",
-  "type": "module",
-  "main": "index.js",
-  "files": ["index.js", "client.js", "cordis.patch.yml", "README.md"],
-  "exports": {
-    ".": "./index.js",
-    "./client": "./client.js"
-  },
-  "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
-    "client": { "platform": "web" }
-  }
+﻿{
+    "name":  "dsh-thinking-effort",
+    "version":  "0.3.0",
+    "description":  "Declare Codex-style reasoning effort levels for OpenAI-compatible third-party models, pin the route-level default effort (high by default) so re-selecting a model keeps your level, and remember per-model effort choices in the browser.",
+    "type":  "module",
+    "main":  "index.js",
+    "files":  [
+                  "index.js",
+                  "client.js",
+                  "cordis.patch.yml",
+                  "README.md"
+              ],
+    "exports":  {
+                    ".":  "./index.js",
+                    "./client":  "./client.js"
+                },
+    "dsh":  {
+                "bundle":  {
+                               "patch":  "./cordis.patch.yml"
+                           },
+                "client":  {
+                               "platform":  "web"
+                           }
+            }
 }
