@@ -5,6 +5,17 @@ OpenAI-compatible **third-party models** in DeepSeek Harness, so the built-in
 model selector shows its **Effort** row for those models — and pin the
 route-level default effort so switching away and back keeps your choice.
 
+## 💬 DeepSeek Harness 插件交流群
+
+欢迎加入 **DeepSeek Harness 插件交流 QQ 群**——插件开发、模型接入、推理档位、
+第三方厂商配置等话题都可以在这里交流，本插件的问题与建议也欢迎直接进群反馈：
+
+> ## 🐧 QQ 群号：`1105449571`
+>
+> 打开 QQ → 搜索群号 **1105449571** 即可加入（进群请备注「dsh 插件」）
+
+群内可交流：插件开发经验、模型接入与档位配置、DSH 使用技巧、新功能需求投票等。
+
 ## 多功能插件（v0.5.0+）
 
 本插件按**模块**组合多个扩展功能，安装一次全部生效，后续功能持续加入：
@@ -151,3 +162,14 @@ dsh plugin add ./dsh-thinking-effort-0.3.0.tgz
 dsh --profile demo --dump-config
 dsh --profile demo
 ```
+
+---
+
+## 📣 加入交流
+
+对 DeepSeek Harness 插件开发感兴趣？欢迎加入交流群一起讨论：
+
+**QQ 群：`1105449571`**（QQ 内搜索群号即可加入）
+
+群内分享：插件开发经验、模型接入配置、档位与推理调优、DSH 使用技巧。
+如果这个插件帮到了你，也欢迎进群点个赞、提个建议 🌟
