@@ -5,6 +5,31 @@ OpenAI-compatible **third-party models** in DeepSeek Harness, so the built-in
 model selector shows its **Effort** row for those models — and pin the
 route-level default effort so switching away and back keeps your choice.
 
+## 多功能插件（v0.5.0+）
+
+本插件按**模块**组合多个扩展功能，安装一次全部生效，后续功能持续加入：
+
+| 模块 | 功能 |
+| --- | --- |
+| `modules/thinking-effort.js` | 推理档位：为第三方模型声明档位并钉住默认档位 |
+| `modules/refdir.js` | **引用目录（附加文件夹）**：为会话添加可读写的白名单文件夹，对话可用 `refdir_list/read/write/edit/grep` 工具操作，类似 Claude Desktop 的附加文件夹/副工作区 |
+
+新增功能 = 在 `modules/` 下加一个模块文件并在 `index.js` 挂上，安装方式不变。
+
+## 引用目录（refdir 模块）
+
+### 入口
+
+- 点击输入框左侧 **+ 按钮** → 命令菜单选择 **`refdir` 引用目录** → 「＋ 添加引用目录」→ 系统文件夹选择器选中即添加（再点已添加的目录行 = 移除）
+- 输入框工具行新增 **📁 芯片**（显示引用目录数量）、会话标题栏新增 **「📁 引用目录」按钮** → 打开管理面板：显示主工作区路径、目录列表（可一键移除）、添加按钮
+
+### 对话获得的能力（添加引用目录后）
+
+- 5 个专属动态工具：`refdir_list`（列文件）、`refdir_read`（读文件）、`refdir_write`（写文件）、`refdir_edit`（编辑）、`refdir_grep`（搜索）
+- 工具只能访问**你显式添加的引用目录**内的路径（白名单校验，`fs.contains` 围栏），引用目录之外的路径一律拒绝
+- 每个会话一份独立列表；持久化到该会话日志目录旁的 `refdirs.json`（重启 DSH 后重新加载插件即可恢复）
+- 浏览器 UI 通过标准命令通道（Host 注册 `refdir-list/add/remove` 命令，客户端 `ctx.remote.commands.execute` 调用）读写列表，不依赖自定义 RPC；插件本身保持纯 JS 零第三方依赖
+
 ## 这是什么
 
 DSH 的 llm 服务只为**适配器声明了档位**的模型接受 `reasoningEffort`。第三方
