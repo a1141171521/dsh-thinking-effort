@@ -61,7 +61,7 @@ export function apply(ctx, config) {
       for (const provider of Object.keys(providers)) {
         const profile = providers[provider]
         if (profile === undefined || profile === null || typeof profile !== 'object') continue
-        if (profile.api !== 'openai-completions') continue
+        if (profile.api !== 'openai-completions' && profile.api !== 'openai-responses') continue
         const providerPatch = {}
         // Pin the route-level default effort so re-selecting a model keeps
         // the level. Only when the deployment left it unset.

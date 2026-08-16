@@ -64,6 +64,10 @@ reasoningEfforts:
 > （包括手动钉为 `null` 的）保持不动；`reasoningEfforts: false` 的模型
 > 不触碰。
 
+本模块**同时处理** `api: openai-completions` 与 `api: openai-responses`
+两类 provider；新接入的 Responses API 运营商也会在接入时自动补齐档位声明，
+无需手动配置。
+
 声明后，内置模型选择器的模型下方会出现 Effort 行，可逐档选择；选中的档位
 通过官方 `selectModel` 通道保存，请求时以 `reasoning_effort` 参数发送。
 
@@ -143,7 +147,8 @@ dsh plugin add ./dsh-thinking-effort-0.3.0.tgz
 
 ## 说明与限制
 
-- 只处理 `api: openai-completions` 的 provider；档位声明对 `models` 列表生效。
+- 同时处理 `api: openai-completions` 与 `api: openai-responses` 的
+  provider；档位声明对 `models` 列表生效。
 - 档位声明与默认档位写入都是**幂等**的：已声明的模型、已钉默认档位的
   provider 不会被重复写入。
 - 若某个厂商端点实际不识别 `reasoning_effort`，请求可能被**厂商**拒绝
