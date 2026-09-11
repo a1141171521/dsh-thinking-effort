@@ -24,10 +24,39 @@ const STORE_FILE = 'refdirs.json'
 const dirsBySession = new Map()      // sessionId -> [{ id, path, title, addedAt }]
 const storeDirBySession = new Map()  // sessionId -> 持久化目录（缓存）
 
-export const inject = ['tools', 'commands', 'fs', 'sessionPersistence', 'sessions']
+export const inject = ['tools', 'commands', 'fs', 'sessionPersistence', 'sessions', 'sandboxPolicy']
 
 export function apply(ctx) {
   const fs = ctx.fs
+  const sandboxPolicy = ctx.sandboxPolicy
+
+  /**
+   * 本次写入使用的沙箱策略。
+   *
+   * 以前这里一律传 `{ mode: 'danger-full-access' }`：插件会无条件关掉 fs 围栏，
+   * 连只读会话（read-only）里 persist 也照写不误；而该分支根本不读 workspaceRoot，
+   * 所以那个 `workspaceRoot: dir` 是死参数，看着像在限制其实什么都没限制。
+   *
+   * 现在改为：
+   *   - 会话为 read-only 时如实返回 read-only，由 harness 拒绝这次写入（不再越权）；
+   *   - 其余情况用 workspace-write，并把**可写根限定为本次操作所属的那个目录**
+   *     （引用目录根，或会话日志目录），而不是全盘放开。
+   *
+   * 这样白名单围栏由 harness 真正执行（它会重新 realpath 一次，顺带消除插件自身
+   * fs.contains 检查与写入之间的符号链接 TOCTOU 间隙）。目标路径此前已由
+   * resolveUnderRefDir 用 fs.contains 校验过，两处校验互不冲突。
+   */
+  function writePolicy(sessionId, root) {
+    let session
+    try {
+      session = ctx.sessions.get(sessionId)
+    } catch (error) {
+      session = undefined
+    }
+    const base = session === undefined ? sandboxPolicy.resolve() : sandboxPolicy.resolve({ session })
+    if (base.mode === 'read-only') return { mode: 'read-only' }
+    return { mode: 'workspace-write', workspaceRoot: root }
+  }
 
   // ---------- 持久化 ----------
 
@@ -76,7 +105,7 @@ export function apply(ctx) {
       const dir = await sessionDir(sessionId)
       if (dir === undefined) return
       const target = await fs.resolve(dir + '/' + STORE_FILE)
-      await fs.writeText(target, JSON.stringify({ dirs: listDirs(sessionId) }, null, 2), undefined, undefined, { mode: 'danger-full-access', workspaceRoot: dir })
+      await fs.writeText(target, JSON.stringify({ dirs: listDirs(sessionId) }, null, 2), undefined, undefined, writePolicy(sessionId, dir))
     } catch (error) {
       console.error('[dsh-refdir] 持久化引用目录失败（仅保留内存态）', error instanceof Error ? error.message : String(error))
     }
@@ -211,7 +240,7 @@ export function apply(ctx) {
 
   disposers.push(ctx.tools.register({
     name: 'refdir_write',
-    description: '在引用目录下创建或覆盖写入一个 UTF-8 文本文件。父目录必须已存在（不支持自动创建目录）。返回写入结果。',
+    description: '在引用目录下创建或覆盖写入一个 UTF-8 文本文件。父目录不存在时会自动创建。返回写入结果。',
     parameters: {
       type: 'object',
       properties: {
@@ -226,8 +255,9 @@ export function apply(ctx) {
       if (!args || typeof args.path !== 'string' || args.path.trim() === '') throw new Error('refdir_write: 需要 path 参数')
       if (typeof args.content !== 'string') throw new Error('refdir_write: 需要 content 参数')
       const { target, dir } = await resolveUnderRefDir(sessionId, args.path)
-      // 写操作逐调用授权到引用目录根（用户显式添加即授权；白名单已由 resolveUnderRefDir 校验）
-      const outcome = await fs.writeText(target, args.content, undefined, undefined, { mode: 'danger-full-access', workspaceRoot: dir.path })
+      // 写操作逐调用授权到引用目录根（用户显式添加即授权；白名单已由 resolveUnderRefDir 校验）。
+      // 沙箱策略把可写根限定为这个引用目录，由 harness 再独立校验一次。
+      const outcome = await fs.writeText(target, args.content, undefined, undefined, writePolicy(sessionId, dir.path))
       return { ok: true, path: target.displayPath, operation: outcome.operation }
     },
   }))
@@ -256,7 +286,7 @@ export function apply(ctx) {
         oldString: args.oldString,
         newString: args.newString,
         replaceAll: args.replaceAll === true,
-      }, undefined, undefined, { mode: 'danger-full-access', workspaceRoot: dir.path })
+      }, undefined, undefined, writePolicy(sessionId, dir.path))
       return { ok: true, path: target.displayPath }
     },
   }))

@@ -1,6 +1,6 @@
 {
   "name": "dsh-thinking-effort",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "多功能 DSH 插件：① 为 OpenAI 兼容第三方模型声明 Codex 风格推理档位并钉住默认档位；② 引用目录（附加文件夹）——为会话添加可读写的白名单文件夹，注册 refdir_list/read/write/edit/grep 工具。安装一次，按模块持续扩展。",
   "type": "module",
   "main": "index.js",
