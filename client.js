@@ -106,7 +106,10 @@ window.__ModuleLoader__.load({
       if (remote === undefined || !remote.commands || typeof remote.commands.execute !== 'function') {
         throw new Error('命令通道不可用')
       }
-      const envelope = await remote.commands.execute(sessionId, line)
+      // commands/execute 的远程契约是 execute(agent, line, images, signal)：
+      // 3 个业务参数（sessionId、命令行、图片附件数组）+ 可选 AbortSignal。
+      // 少传 images 会被网关以 "expected 3 business argument(s)" 拒绝。
+      const envelope = await remote.commands.execute(sessionId, line, [])
       if (!envelope || !envelope.ok) {
         const err = envelope && envelope.error
         throw new Error('命令执行失败: ' + (err ? err.code + ': ' + err.message : line))
